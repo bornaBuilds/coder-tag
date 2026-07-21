@@ -12,12 +12,21 @@
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "coder-tag.helloWorld",
-        "title": "Hello World"
+    "configuration": {
+      "title": "Coder Tag",
+      "properties": {
+        "coderTag.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable coder tags"
+        },
+        "coderTag.audioFile": {
+          "type": "string",
+          "default": "",
+          "description": "The path to the audio file to play when a coder tag is triggered"
+        }
       }
-    ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -28,17 +37,21 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.93.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "24.x",
-    "typescript-eslint": "^8.61.1",
+    "@types/sound-play": "^1.1.3",
+    "@types/vscode": "^1.93.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.0.0",
     "eslint": "^10.5.0",
     "typescript": "^6.0.3",
-    "@vscode/test-cli": "^0.0.15",
-    "@vscode/test-electron": "^3.0.0"
+    "typescript-eslint": "^8.61.1"
   },
   "overrides": {
     "diff": "^8.0.4",
     "serialize-javascript": "^7.0.6"
+  },
+  "dependencies": {
+    "sound-play": "^1.1.0"
   }
 }
