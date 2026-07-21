@@ -1,61 +1,46 @@
 import * as vscode from "vscode";
+import { GitAPI, GitExtension } from "./gitApi";
 
-export interface GitExtension {
-  getAPI(version: 1): GitAPI;
-}
-
-export interface GitAPI {
-  repositories: Repository[];
-
-  onDidOpenRepository(
-    listener: (repository: Repository) => void,
-  ): vscode.Disposable;
-}
-
-export interface Repository {
-  rootUri: vscode.Uri;
-
-  onDidRunOperation(
-    listener: (event: GitOperationEvent) => void,
-  ): vscode.Disposable;
-}
-
-export interface GitOperationEvent {
-  operation: string;
-}
-
+/**
+ * Loads the public API exported by VS Code's built-in Git extension.
+ *
+ * Git support is optional: callers receive undefined when Git is disabled or
+ * unavailable, allowing the rest of Coder Tag to keep working.
+ */
 export class GitManager {
   private gitAPI: GitAPI | undefined;
 
-  public async initialize(): Promise<void> {
-    const gitExtension =
-      vscode.extensions.getExtension<GitExtension>("vscode.git");
+  public async initialize(): Promise<GitAPI | undefined> {
+    if (this.gitAPI) {
+      return this.gitAPI;
+    }
+
+    const gitExtension = vscode.extensions.getExtension<GitExtension>("vscode.git");
 
     if (!gitExtension) {
-      console.warn("Git extension not found");
-      return;
+      console.warn("Coder Tag: the built-in Git extension is unavailable.");
+      return undefined;
     }
 
-    const git = gitExtension.exports;
+    try {
+      const git = gitExtension.isActive
+        ? gitExtension.exports
+        : await gitExtension.activate();
 
-    if (!git) {
-      return;
+      if (!git?.enabled) {
+        console.warn("Coder Tag: the built-in Git extension is disabled.");
+        return undefined;
+      }
+
+      this.gitAPI = git.getAPI(1);
+      return this.gitAPI;
+    } catch (error) {
+      console.error("Coder Tag: failed to initialize Git integration.", error);
+      return undefined;
     }
-
-    this.gitAPI = git.getAPI(1);
-
-    for (const repository of this.gitAPI.repositories) {
-      this.subscribeToRepository(repository);
-    }
-
-    this.gitAPI.onDidOpenRepository((repository) => {
-      this.subscribeToRepository(repository);
-    });
   }
 
-  private subscribeToRepository(repository: Repository): void {
-    repository.onDidRunOperation((event) => {
-      console.log(`Git operation: ${event.operation}`);
-    });
+  public getAPI(): GitAPI | undefined {
+    return this.gitAPI;
   }
 }

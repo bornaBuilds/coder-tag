@@ -1,29 +1,72 @@
 {
   "name": "coder-tag",
-  "displayName": "coder-tag",
-  "description": "Play a producer tag drop on successful git push",
+  "displayName": "Coder Tag",
+  "description": "Play your own producer-tag-style sound when you publish code.",
   "version": "0.0.1",
+  "publisher": "your-publisher-id",
   "engines": {
     "vscode": "^1.93.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:coderTag.preview",
+    "onCommand:coderTag.selectSound",
+    "onCommand:coderTag.addSound",
+    "onCommand:coderTag.removeSound",
+    "onCommand:coderTag.toggleEnabled",
+    "onCommand:coderTag.testPush",
+    "onCommand:coderTag.showMenu"
+  ],
   "main": "./out/extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "coderTag.preview",
+        "title": "Coder Tag: Preview Producer Tag"
+      },
+      {
+        "command": "coderTag.selectSound",
+        "title": "Coder Tag: Select Producer Tag"
+      },
+      {
+        "command": "coderTag.addSound",
+        "title": "Coder Tag: Add Sound"
+      },
+      {
+        "command": "coderTag.removeSound",
+        "title": "Coder Tag: Remove Sound"
+      },
+      {
+        "command": "coderTag.toggleEnabled",
+        "title": "Coder Tag: Toggle Enabled"
+      },
+      {
+        "command": "coderTag.testPush",
+        "title": "Coder Tag: Test Push"
+      }
+    ],
     "configuration": {
       "title": "Coder Tag",
       "properties": {
         "coderTag.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable or disable coder tags"
+          "description": "Enable or disable playing the selected producer tag for push events."
         },
-        "coderTag.audioFile": {
+        "coderTag.selectedSound": {
           "type": "string",
           "default": "",
-          "description": "The path to the audio file to play when a coder tag is triggered"
+          "description": "The ID of the selected producer tag. Use the Select Producer Tag command to change it."
+        },
+        "coderTag.volume": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Playback volume from 0 (silent) to 1 (full volume)."
         }
       }
     }
@@ -32,6 +75,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "generate-demo-sounds": "node scripts/generateDemoSounds.mjs",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test"

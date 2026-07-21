@@ -1,71 +1,127 @@
-# coder-tag README
+# Coder Tag
 
-This is the README for your extension "coder-tag". After writing up a brief description, we recommend including the following sections.
+Coder Tag is a VS Code/Cursor extension that plays a producer-tag-style audio
+clip when code is published. It includes three original demo tones and supports
+user-added MP3 and WAV files.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- Preview any available sound without changing your selection.
+- Select from bundled demo sounds or local MP3/WAV files.
+- Remove user-added sounds without deleting the original files.
+- Enable or disable push playback and control volume.
+- Use the status bar menu for common actions.
+- Test the complete push-to-audio flow without relying on Git detection.
 
-For example if there is an image subfolder under your extension project workspace:
+## Run Locally
 
-\!\[feature X\]\(images/feature-x.png\)
+1. Install dependencies with `npm install`.
+2. Open this repository in VS Code or Cursor.
+3. Press `F5` and choose **Run Extension** if prompted.
+4. In the Extension Development Host, open the Command Palette.
+5. Run **Coder Tag: Select Producer Tag**, then **Coder Tag: Test Push**.
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+The default build task runs the TypeScript watcher. You can also run:
 
-## Requirements
+```sh
+npm run compile
+npm run lint
+npm test
+```
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+## Commands
 
-## Extension Settings
+- **Coder Tag: Preview Producer Tag** chooses and plays a sound without saving
+  it as the current sound.
+- **Coder Tag: Select Producer Tag** saves a sound as the current selection.
+- **Coder Tag: Add Sound** adds a local `.mp3` or `.wav` file.
+- **Coder Tag: Remove Sound** removes user-added metadata after confirmation.
+  It never deletes the original file, and bundled sounds cannot be removed.
+- **Coder Tag: Toggle Enabled** enables or disables push playback.
+- **Coder Tag: Test Push** sends a manual event through the same `PushHandler`
+  used by automatic events.
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+Click the Coder Tag status bar item to open a menu containing these actions.
 
-For example:
+## Settings
 
-This extension contributes the following settings:
+- `coderTag.enabled`: enables or disables playback for push events.
+- `coderTag.selectedSound`: stores the selected sound ID. Prefer the Select
+  Producer Tag command instead of editing this value manually.
+- `coderTag.volume`: playback volume from `0` to `1`.
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+Settings and user-added sound metadata persist across restarts. Built-in sounds
+are resolved relative to the installed extension. User sounds keep their
+original absolute paths for this MVP.
 
-## Known Issues
+## Git Push Detection
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+All events use one pipeline:
 
-## Release Notes
+```text
+PushDetector or Test Push command
+              |
+              v
+          PushHandler
+              |
+              v
+         AudioManager
+              |
+              v
+       Selected Producer Tag
+```
 
-Users appreciate release notes as you update your extension.
+The VS Code 1.93 public Git API does not expose a general successful-push event.
+Coder Tag uses only the verified `gitAPI.onDidPublish` event, which fires when
+VS Code publishes a repository or branch for the first time. It does not call
+the unsupported `onDidRunOperation` method and does not treat remote-tracking
+ref changes as proof of a push.
 
-### 1.0.0
+Use **Coder Tag: Test Push** to reliably exercise ordinary push behavior in V1.
+The command respects `coderTag.enabled` and uses exactly the same `PushHandler`
+as automatic publish events.
 
-Initial release of ...
+## Bundled Demo Sounds
 
-### 1.0.1
+The files in `media/` are short, original synthesized WAV tones:
 
-Fixed issue #.
+```text
+media/demo-tag-1.wav
+media/demo-tag-2.wav
+media/demo-tag-3.wav
+```
 
-### 1.1.0
+Run `npm run generate-demo-sounds` to regenerate them. To use different
+development assets, place MP3 or WAV files in `media/` and update the built-in
+entries in `src/sounds/soundLibraryManager.ts`. Do not use copyrighted producer
+tags unless you have permission to distribute them.
 
-Added features X, Y, and Z.
+## Packaging
 
----
+1. Replace `your-publisher-id` in `package.json` with your Visual Studio
+   Marketplace publisher ID.
+2. Compile and lint the extension.
+3. Install or invoke VSCE and build the package:
 
-## Following extension guidelines
+```sh
+npm run compile
+npm run lint
+npx @vscode/vsce package
+```
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+The generated `.vsix` can be installed with **Extensions: Install from VSIX**.
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+## Current MVP Limitations
 
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+- Ordinary `git push` commands are not automatically detected because the
+  supported Git and terminal APIs available to this extension cannot identify
+  them reliably. Terminal aliases, external terminals, and other Git clients
+  make command interception incomplete.
+- Automatic playback currently covers only VS Code's first-time Git publish
+  event. Test Push is the reliable test path.
+- `sound-play` depends on operating-system playback facilities. MP3/WAV codec
+  support can vary by system.
+- `sound-play` has no reliable cross-platform stop API, so `stop()` is a no-op.
+- User sound paths are absolute. Moving or deleting a file makes it unavailable
+  until it is re-added.
+- The extension does not yet download online sound packs.

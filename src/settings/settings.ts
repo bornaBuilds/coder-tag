@@ -1,48 +1,69 @@
 import * as vscode from "vscode";
 
-export class SettingsManager {
-  /**
-   * The VS Code configuration section
-   * used by this extension
-   */
+const configurationSection = "coderTag";
 
-  private readonly config = vscode.workspace.getConfiguration("coderTag");
+/**
+ * Reads and updates the user-facing settings contributed by the extension.
+ */
+export class SettingsManager implements vscode.Disposable {
+  private readonly changeEmitter = new vscode.EventEmitter<void>();
+  private readonly configurationSubscription: vscode.Disposable;
 
-  /**
-   * Returns whether coder tags
-   * are currently enabled.
-   */
-  public isEnabled(): boolean {
-    return this.config.get<boolean>("enabled", true);
+  public readonly onDidChange = this.changeEmitter.event;
+
+  constructor() {
+    this.configurationSubscription =
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration(configurationSection)) {
+          this.changeEmitter.fire();
+        }
+      });
   }
 
-  /**
-   * Enable or disable coder tags.
-   */
+  public isEnabled(): boolean {
+    return this.configuration.get<boolean>("enabled", true);
+  }
+
   public async setEnabled(enabled: boolean): Promise<void> {
-    await this.config.update(
+    await this.configuration.update(
       "enabled",
       enabled,
       vscode.ConfigurationTarget.Global,
     );
   }
 
-  /**
-   * Returns the path of the currently
-   * selected audio file.
-   */
-  public getSelectedSound(): string | undefined {
-    return this.config.get<string>("audioFile");
+  public getSelectedSoundId(): string | undefined {
+    return this.configuration.get<string>("selectedSound");
   }
 
-  /**
-   * Saves the selected audio file.
-   */
-  public async setSelectedSound(filePath: string): Promise<void> {
-    await this.config.update(
-      "audioFile",
-      filePath,
+  public async setSelectedSoundId(soundId: string | undefined): Promise<void> {
+    await this.configuration.update(
+      "selectedSound",
+      soundId,
       vscode.ConfigurationTarget.Global,
     );
+  }
+
+  public getVolume(): number {
+    const volume = this.configuration.get<number>("volume", 1);
+    return Math.min(1, Math.max(0, volume));
+  }
+
+  public async setVolume(volume: number): Promise<void> {
+    const safeVolume = Math.min(1, Math.max(0, volume));
+    await this.configuration.update(
+      "volume",
+      safeVolume,
+      vscode.ConfigurationTarget.Global,
+    );
+  }
+
+  public dispose(): void {
+    this.configurationSubscription.dispose();
+    this.changeEmitter.dispose();
+  }
+
+  private get configuration(): vscode.WorkspaceConfiguration {
+    return vscode.workspace.getConfiguration(configurationSection);
   }
 }
