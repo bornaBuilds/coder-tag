@@ -10,3 +10,5 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Added preview, selection, removal, enable/disable, and Test Push commands.
 - Added the status bar menu and configurable playback volume.
 - Added a verified Git publish detector behind the PushDetector abstraction.
+- Added opt-in, cross-platform attempted-push detection using safely chained
+  Git `pre-push` hooks.

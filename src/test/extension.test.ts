@@ -19,6 +19,8 @@ suite("Coder Tag extension", () => {
       "coderTag.removeSound",
       "coderTag.toggleEnabled",
       "coderTag.testPush",
+      "coderTag.installPushHook",
+      "coderTag.uninstallPushHook",
       "coderTag.showMenu",
     ];
 

@@ -11,10 +11,15 @@ export interface GitExtension {
 }
 
 export interface GitAPI {
+  readonly git: Git;
   readonly repositories: Repository[];
   readonly onDidOpenRepository: vscode.Event<Repository>;
   readonly onDidCloseRepository: vscode.Event<Repository>;
   readonly onDidPublish: vscode.Event<PublishEvent>;
+}
+
+export interface Git {
+  readonly path: string;
 }
 
 export interface Repository {

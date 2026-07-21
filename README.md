@@ -1,8 +1,8 @@
 # Coder Tag
 
 Coder Tag is a VS Code/Cursor extension that plays a producer-tag-style audio
-clip when code is published. It includes three original demo tones and supports
-user-added MP3 and WAV files.
+clip when you attempt to push code. It includes three original demo tones and
+supports user-added MP3 and WAV files.
 
 ## Features
 
@@ -12,6 +12,7 @@ user-added MP3 and WAV files.
 - Enable or disable push playback and control volume.
 - Use the status bar menu for common actions.
 - Test the complete push-to-audio flow without relying on Git detection.
+- Install a cross-platform Git `pre-push` hook for automatic detection.
 
 ## Run Locally
 
@@ -40,6 +41,10 @@ npm test
 - **Coder Tag: Toggle Enabled** enables or disables push playback.
 - **Coder Tag: Test Push** sends a manual event through the same `PushHandler`
   used by automatic events.
+- **Coder Tag: Install Push Hook** enables attempted-push detection for an open
+  repository after confirmation.
+- **Coder Tag: Uninstall Push Hook** removes Coder Tag's dispatcher and restores
+  any hook that was preserved during installation.
 
 Click the Coder Tag status bar item to open a menu containing these actions.
 
@@ -59,7 +64,7 @@ original absolute paths for this MVP.
 All events use one pipeline:
 
 ```text
-PushDetector or Test Push command
+Pre-push hook, Git publish event, or Test Push command
               |
               v
           PushHandler
@@ -72,14 +77,31 @@ PushDetector or Test Push command
 ```
 
 The VS Code 1.93 public Git API does not expose a general successful-push event.
-Coder Tag uses only the verified `gitAPI.onDidPublish` event, which fires when
-VS Code publishes a repository or branch for the first time. It does not call
-the unsupported `onDidRunOperation` method and does not treat remote-tracking
-ref changes as proof of a push.
+Coder Tag therefore offers an opt-in client-side `pre-push` hook. Run **Coder
+Tag: Install Push Hook** once for each repository where detection is wanted.
+The hook runs for pushes started through the Source Control UI, Command Palette,
+integrated terminal, or another Git client using that repository.
 
-Use **Coder Tag: Test Push** to reliably exercise ordinary push behavior in V1.
-The command respects `coderTag.enabled` and uses exactly the same `PushHandler`
-as automatic publish events.
+The hook fires before Git transfers objects. It proves that a push was
+attempted, not that the remote accepted it. Failed, rejected, and cancelled
+pushes may still play the sound. The hook writes a small event file containing
+the repository root; the extension consumes it and sends one `PushEvent` to the
+shared `PushHandler`.
+
+Installation uses `git rev-parse --git-path hooks`, so worktrees and configured
+hook directories are respected. If a `pre-push` hook already exists, Coder Tag
+preserves it byte-for-byte and invokes it with the original arguments and
+standard input. Uninstall restores that hook. Coder Tag refuses to overwrite
+hook files that changed unexpectedly.
+
+The hook is a portable `#!/bin/sh` script. Git for Windows supplies the shell
+used for hooks, so the same dispatcher works on Windows, macOS, and Linux.
+First-time VS Code publish events remain a fallback and are deduplicated against
+hook events.
+
+Coder Tag does not call the unsupported `onDidRunOperation` method and does not
+treat remote-tracking ref changes as proof of a push. Use **Coder Tag: Test
+Push** to exercise the same handler without changing repository hooks.
 
 ## Bundled Demo Sounds
 
@@ -113,12 +135,11 @@ The generated `.vsix` can be installed with **Extensions: Install from VSIX**.
 
 ## Current MVP Limitations
 
-- Ordinary `git push` commands are not automatically detected because the
-  supported Git and terminal APIs available to this extension cannot identify
-  them reliably. Terminal aliases, external terminals, and other Git clients
-  make command interception incomplete.
-- Automatic playback currently covers only VS Code's first-time Git publish
-  event. Test Push is the reliable test path.
+- Hook installation is opt-in and must be performed for each repository.
+- A `pre-push` event means a push was attempted; it cannot confirm success.
+- Hook conflicts require manual resolution instead of risking user files.
+- A changed extension storage location can require manual hook conflict
+  resolution so Coder Tag does not overwrite an older installation.
 - `sound-play` depends on operating-system playback facilities. MP3/WAV codec
   support can vary by system.
 - `sound-play` has no reliable cross-platform stop API, so `stop()` is a no-op.

@@ -1,7 +1,7 @@
 {
   "name": "coder-tag",
   "displayName": "Coder Tag",
-  "description": "Play your own producer-tag-style sound when you publish code.",
+  "description": "Play your own producer-tag-style sound when you push code.",
   "version": "0.0.1",
   "publisher": "your-publisher-id",
   "engines": {
@@ -18,6 +18,8 @@
     "onCommand:coderTag.removeSound",
     "onCommand:coderTag.toggleEnabled",
     "onCommand:coderTag.testPush",
+    "onCommand:coderTag.installPushHook",
+    "onCommand:coderTag.uninstallPushHook",
     "onCommand:coderTag.showMenu"
   ],
   "main": "./out/extension.js",
@@ -46,6 +48,14 @@
       {
         "command": "coderTag.testPush",
         "title": "Coder Tag: Test Push"
+      },
+      {
+        "command": "coderTag.installPushHook",
+        "title": "Coder Tag: Install Push Hook"
+      },
+      {
+        "command": "coderTag.uninstallPushHook",
+        "title": "Coder Tag: Uninstall Push Hook"
       }
     ],
     "configuration": {

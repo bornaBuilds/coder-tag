@@ -2,8 +2,13 @@ import * as vscode from "vscode";
 import { SoundPlayAudioPlayer } from "./audio/audioPlayer";
 import { AudioManager } from "./audio/audioManager";
 import { CommandManager } from "./commands/commands";
+import { GitHookManager } from "./git/gitHookManager";
 import { GitManager } from "./git/gitManager";
-import { GitPublishPushDetector } from "./git/pushDetector";
+import {
+  CompositePushDetector,
+  GitPublishPushDetector,
+  HookPushDetector,
+} from "./git/pushDetector";
 import { PushHandler } from "./git/pushHandler";
 import { SettingsManager } from "./settings/settings";
 import { SoundLibraryManager } from "./sounds/soundLibraryManager";
@@ -25,13 +30,25 @@ export async function activate(
     soundLibrary,
   );
   const gitManager = new GitManager();
-  const pushDetector = new GitPublishPushDetector(gitManager);
+  const pushEventDirectory = vscode.Uri.joinPath(
+    context.globalStorageUri,
+    "push-events",
+  ).fsPath;
+  const gitHookManager = new GitHookManager(
+    gitManager,
+    pushEventDirectory,
+  );
+  const pushDetector = new CompositePushDetector([
+    new HookPushDetector(pushEventDirectory),
+    new GitPublishPushDetector(gitManager),
+  ]);
   const pushHandler = new PushHandler(audioManager);
   const commandManager = new CommandManager(
     audioManager,
     soundLibrary,
     settings,
     pushHandler,
+    gitHookManager,
   );
   const statusBar = new StatusBarManager(settings, soundLibrary);
 
@@ -46,6 +63,7 @@ export async function activate(
   context.subscriptions.push(
     settings,
     soundLibrary,
+    gitHookManager,
     pushDetector,
     pushSubscription,
     commandManager,
@@ -53,6 +71,7 @@ export async function activate(
     new vscode.Disposable(() => audioManager.stop()),
   );
 
+  await gitHookManager.initialize();
   await pushDetector.start();
   console.log("Coder Tag extension activated.");
 }
