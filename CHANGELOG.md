@@ -10,3 +10,6 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Added preview, selection, removal, enable/disable, and Test Push commands.
 - Added the status bar menu and configurable playback volume.
 - Added a verified Git publish detector behind the PushDetector abstraction.
+- Added cross-platform playback through native macOS and Windows facilities
+  plus ordered Linux audio-player fallbacks.
+- Added stoppable playback and safe process arguments for local audio paths.
