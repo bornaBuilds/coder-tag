@@ -47,6 +47,30 @@ export class SoundLibraryManager implements vscode.Disposable {
         "Demo Tag 3",
         "demo-tag-3.wav",
       ),
+      this.createBuiltInSound(
+        extensionUri,
+        "builtin-chat-gpt-made-it",
+        "Chat GPT made it",
+        "chat-gpt-made-it.mp3",
+      ),
+      this.createBuiltInSound(
+        extensionUri,
+        "builtin-metro-boomin-once-more",
+        "Metro Boomin - Once More",
+        "metro-boomin-once-more.mp3",
+      ),
+      this.createBuiltInSound(
+        extensionUri,
+        "builtin-if-young-metro-dont-trust-you",
+        "If Young Metro, Don't Trust You",
+        "if-young-metro-dont-trust-you.mp3",
+      ),
+      this.createBuiltInSound(
+        extensionUri,
+        "builtin-coby",
+        "Coby Jesil ti",
+        "coby-jesil-ti.mp3",
+      ),
     ];
     this.userSounds = this.loadUserSounds();
   }
