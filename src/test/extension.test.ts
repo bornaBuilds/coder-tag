@@ -18,6 +18,8 @@ suite("Coder Tag extension", () => {
       "coderTag.addSound",
       "coderTag.removeSound",
       "coderTag.toggleEnabled",
+      "coderTag.setVolume",
+      "coderTag.openSettings",
       "coderTag.testPush",
       "coderTag.showMenu",
     ];
@@ -26,14 +28,24 @@ suite("Coder Tag extension", () => {
       assert.ok(commands.includes(command), `${command} was not registered`);
     }
 
-    for (let index = 1; index <= 3; index += 1) {
+    const bundledSounds = [
+      "demo-tag-1.wav",
+      "demo-tag-2.wav",
+      "demo-tag-3.wav",
+      "chat-gpt-made-it.mp3",
+      "metro-boomin-once-more.mp3",
+      "if-young-metro-dont-trust-you.mp3",
+      "coby-jesil-ti.mp3",
+    ];
+
+    for (const fileName of bundledSounds) {
       const soundUri = vscode.Uri.joinPath(
         extension.extensionUri,
         "media",
-        `demo-tag-${index}.wav`,
+        fileName,
       );
       const stat = await vscode.workspace.fs.stat(soundUri);
-      assert.ok(stat.size > 44, `${soundUri.fsPath} is not a valid WAV asset`);
+      assert.ok(stat.size > 44, `${soundUri.fsPath} is not a valid audio asset`);
     }
   });
 });

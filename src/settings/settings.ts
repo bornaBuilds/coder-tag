@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { defaultSoundId } from "../sounds/producerTag";
 
 const configurationSection = "coderTag";
 
@@ -33,7 +34,7 @@ export class SettingsManager implements vscode.Disposable {
   }
 
   public getSelectedSoundId(): string | undefined {
-    return this.configuration.get<string>("selectedSound");
+    return this.configuration.get<string>("selectedSound", defaultSoundId);
   }
 
   public async setSelectedSoundId(soundId: string | undefined): Promise<void> {

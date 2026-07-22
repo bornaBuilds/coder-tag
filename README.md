@@ -1,16 +1,20 @@
 # Coder Tag
 
 Coder Tag is a VS Code/Cursor extension that plays a producer-tag-style audio
-clip when code is published. It includes three original demo tones and supports
+clip after a successful Git push. It includes seven bundled sounds and supports
 user-added MP3 and WAV files.
 
 ## Features
 
 - Preview any available sound without changing your selection.
-- Select from bundled demo sounds or local MP3/WAV files.
-- Remove user-added sounds without deleting the original files.
+- Start immediately with Demo Tag 1 selected.
+- Select from bundled sounds or imported MP3/WAV files.
+- Keep imported sounds in extension-managed storage so moving the originals
+  does not break playback.
+- Remove user-added sounds and their managed copies without deleting the
+  original files.
 - Enable or disable push playback and control volume.
-- Use the status bar menu for common actions.
+- Use the status bar menu for preview, selection, import, volume, and settings.
 - Test the complete push-to-audio flow without relying on Git detection.
 
 ## Run Locally
@@ -36,8 +40,12 @@ npm test
 - **Coder Tag: Select Producer Tag** saves a sound as the current selection.
 - **Coder Tag: Add Sound** adds a local `.mp3` or `.wav` file.
 - **Coder Tag: Remove Sound** removes user-added metadata after confirmation.
-  It never deletes the original file, and bundled sounds cannot be removed.
+  It deletes Coder Tag's managed copy but never the original file. Bundled
+  sounds cannot be removed.
 - **Coder Tag: Toggle Enabled** enables or disables push playback.
+- **Coder Tag: Set Volume** selects a playback level from 0% to 100%.
+- **Coder Tag: Open Settings** opens the standard VS Code settings page filtered
+  to Coder Tag.
 - **Coder Tag: Test Push** sends a manual event through the same `PushHandler`
   used by automatic events.
 
@@ -47,7 +55,8 @@ Click the Coder Tag status bar item to open a menu containing these actions.
 
 - `coderTag.enabled`: enables or disables playback for push events.
 - `coderTag.selectedSound`: stores the selected sound ID. Prefer the Select
-  Producer Tag command instead of editing this value manually.
+  Producer Tag command instead of editing this value manually. A fresh install
+  defaults to `builtin-demo-1`.
 - `coderTag.volume`: playback volume from `0` to `1`.
 - `coderTag.syncCountsAsPush`: when enabled (the default), the Source Control
   Sync button and auto-sync also play the tag. Because VS Code runs a push on
@@ -55,8 +64,11 @@ Click the Coder Tag status bar item to open a menu containing these actions.
   play only on an explicit push.
 
 Settings and user-added sound metadata persist across restarts. Built-in sounds
-are resolved relative to the installed extension. User sounds keep their
-original absolute paths for this MVP.
+are resolved relative to the installed extension. Imported sounds are copied
+into the extension's global storage; existing external-path entries from
+development builds are migrated automatically. Missing entries are removed
+with a one-time warning and the selection falls back to an available bundled
+sound.
 
 ## Git Push Detection
 
@@ -105,20 +117,24 @@ Use **Coder Tag: Test Push** to exercise the audio path without pushing. It
 respects `coderTag.enabled` and uses exactly the same `PushHandler` as
 automatic events.
 
-## Bundled Demo Sounds
+## Bundled Sounds
 
-The files in `media/` are short, original synthesized WAV tones:
+The extension ships these sounds:
 
 ```text
 media/demo-tag-1.wav
 media/demo-tag-2.wav
 media/demo-tag-3.wav
+media/chat-gpt-made-it.mp3
+media/metro-boomin-once-more.mp3
+media/if-young-metro-dont-trust-you.mp3
+media/coby-jesil-ti.mp3
 ```
 
-Run `npm run generate-demo-sounds` to regenerate them. To use different
-development assets, place MP3 or WAV files in `media/` and update the built-in
-entries in `src/sounds/soundLibraryManager.ts`. Do not use copyrighted producer
-tags unless you have permission to distribute them.
+The three WAV demos are original synthesized tones and can be regenerated with
+`npm run generate-demo-sounds`. The repository owner has confirmed
+redistribution rights for the four bundled MP3 clips. Do not add other
+copyrighted audio unless you have permission to distribute it.
 
 ## Audio Playback Support
 
@@ -142,15 +158,14 @@ that environment.
 
 ## Packaging
 
-1. Replace `your-publisher-id` in `package.json` with your Visual Studio
-   Marketplace publisher ID.
-2. Compile and lint the extension.
-3. Install or invoke VSCE and build the package:
+1. Install dependencies.
+2. Compile, lint, and test the extension.
+3. Build the package:
 
 ```sh
-npm run compile
-npm run lint
-npx @vscode/vsce package
+npm ci
+npm test
+npm exec vsce package
 ```
 
 The generated `.vsix` can be installed with **Extensions: Install from VSIX**.
@@ -173,6 +188,6 @@ The generated `.vsix` can be installed with **Extensions: Install from VSIX**.
   desktop audio utilities.
 - Playback requires an audio device in the environment where the extension
   host is running.
-- User sound paths are absolute. Moving or deleting a file makes it unavailable
-  until it is re-added.
+- Imported sounds consume space in VS Code's extension global storage until
+  removed through Coder Tag.
 - The extension does not yet download online sound packs.

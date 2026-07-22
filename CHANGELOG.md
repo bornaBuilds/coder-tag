@@ -4,7 +4,7 @@ All notable changes to the "coder-tag" extension will be documented in this file
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## [Unreleased]
+## [0.0.1] - 2026-07-22
 
 - Added automatic, zero-setup detection of successful `git push`:
   - Terminal pushes via the Terminal Shell Integration API (plays only on a
@@ -23,3 +23,9 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Added cross-platform playback through native macOS and Windows facilities
   plus ordered Linux audio-player fallbacks.
 - Added stoppable playback and safe process arguments for local audio paths.
+- Added a first-run default sound, direct volume and settings actions, and
+  clearer status bar state.
+- Added extension-managed storage, migration, duplicate detection, and
+  missing-file recovery for custom sounds.
+- Added deterministic clean builds, Marketplace metadata, and CI packaging
+  validation.

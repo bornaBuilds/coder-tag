@@ -1,8 +1,8 @@
-import { randomUUID } from "node:crypto";
-import { promises as fs } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { createReadStream, promises as fs } from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { ProducerTag } from "./producerTag";
+import { defaultSoundId, ProducerTag } from "./producerTag";
 
 const userSoundsStorageKey = "coderTag.userSounds";
 const supportedExtensions = new Set([".mp3", ".wav"]);
@@ -12,26 +12,40 @@ export interface SoundLibrarySettings {
   setSelectedSoundId(soundId: string | undefined): Promise<void>;
 }
 
+export interface SoundLibraryInitializationResult {
+  readonly migratedUserSounds: number;
+  readonly removedUserSounds: number;
+  readonly missingBuiltInSounds: readonly ProducerTag[];
+}
+
 /**
- * Owns the catalog of built-in and user-added sounds. It stores only metadata;
- * actual playback remains the AudioManager's responsibility.
+ * Owns the catalog of built-in and user-added sounds. User files are copied
+ * into extension-managed global storage so they remain available if the
+ * original files are moved or deleted.
  */
 export class SoundLibraryManager implements vscode.Disposable {
   private readonly builtInSounds: ProducerTag[];
   private readonly changeEmitter = new vscode.EventEmitter<void>();
+  private readonly managedSoundsDirectory: string;
+  private readonly unavailableBuiltInSoundIds = new Set<string>();
   private userSounds: ProducerTag[];
 
   public readonly onDidChange = this.changeEmitter.event;
 
   constructor(
     extensionUri: vscode.Uri,
+    globalStorageUri: vscode.Uri,
     private readonly storage: vscode.Memento,
     private readonly settings: SoundLibrarySettings,
   ) {
+    this.managedSoundsDirectory = vscode.Uri.joinPath(
+      globalStorageUri,
+      "sounds",
+    ).fsPath;
     this.builtInSounds = [
       this.createBuiltInSound(
         extensionUri,
-        "builtin-demo-1",
+        defaultSoundId,
         "Demo Tag 1",
         "demo-tag-1.wav",
       ),
@@ -75,8 +89,134 @@ export class SoundLibraryManager implements vscode.Disposable {
     this.userSounds = this.loadUserSounds();
   }
 
+  public async initialize(): Promise<SoundLibraryInitializationResult> {
+    await fs.mkdir(this.managedSoundsDirectory, { recursive: true });
+
+    const missingBuiltInSounds: ProducerTag[] = [];
+    this.unavailableBuiltInSoundIds.clear();
+
+    for (const sound of this.builtInSounds) {
+      if (!(await this.isReadableFile(sound.filePath))) {
+        missingBuiltInSounds.push(sound);
+        this.unavailableBuiltInSoundIds.add(sound.id);
+      }
+    }
+
+    const normalizedSounds: ProducerTag[] = [];
+    const knownHashes = new Set<string>();
+    let migratedUserSounds = 0;
+    let removedUserSounds = 0;
+    let catalogChanged = false;
+
+    for (const sound of this.userSounds) {
+      const extension = path.extname(sound.filePath).toLowerCase();
+
+      if (
+        !supportedExtensions.has(extension) ||
+        !(await this.isReadableFile(sound.filePath))
+      ) {
+        removedUserSounds += 1;
+        catalogChanged = true;
+        continue;
+      }
+
+      let managedPath = sound.filePath;
+
+      if (!this.isManagedSoundPath(managedPath)) {
+        managedPath = path.join(
+          this.managedSoundsDirectory,
+          `${sound.id}${extension}`,
+        );
+
+        try {
+          await fs.copyFile(sound.filePath, managedPath);
+          migratedUserSounds += 1;
+          catalogChanged = true;
+        } catch (error) {
+          console.error(
+            `Coder Tag: could not migrate "${sound.name}" into managed storage.`,
+            error,
+          );
+          removedUserSounds += 1;
+          catalogChanged = true;
+          continue;
+        }
+      }
+
+      let contentHash: string;
+
+      try {
+        contentHash = sound.contentHash ?? await this.hashFile(managedPath);
+      } catch (error) {
+        console.error(
+          `Coder Tag: could not validate "${sound.name}".`,
+          error,
+        );
+        if (this.isManagedSoundPath(managedPath)) {
+          await fs.rm(managedPath, { force: true }).catch(() => undefined);
+        }
+        removedUserSounds += 1;
+        catalogChanged = true;
+        continue;
+      }
+
+      if (knownHashes.has(contentHash)) {
+        if (this.isManagedSoundPath(managedPath)) {
+          await fs.rm(managedPath, { force: true }).catch(() => undefined);
+        }
+        removedUserSounds += 1;
+        catalogChanged = true;
+        continue;
+      }
+
+      knownHashes.add(contentHash);
+      const normalizedSound: ProducerTag = {
+        ...sound,
+        filePath: path.resolve(managedPath),
+        contentHash,
+      };
+      normalizedSounds.push(normalizedSound);
+
+      if (
+        normalizedSound.filePath !== sound.filePath ||
+        normalizedSound.contentHash !== sound.contentHash
+      ) {
+        catalogChanged = true;
+      }
+    }
+
+    if (catalogChanged) {
+      this.userSounds = normalizedSounds;
+      await this.persistUserSounds();
+    }
+
+    const selectedId = this.settings.getSelectedSoundId();
+    const selectedSound = selectedId ? this.findById(selectedId) : undefined;
+    let selectionChanged = false;
+
+    if (!selectedSound) {
+      const fallback = this.builtInSounds.find(
+        (sound) => !this.unavailableBuiltInSoundIds.has(sound.id),
+      );
+      await this.settings.setSelectedSoundId(fallback?.id);
+      selectionChanged = true;
+    }
+
+    if (catalogChanged || selectionChanged) {
+      this.changeEmitter.fire();
+    }
+
+    return {
+      migratedUserSounds,
+      removedUserSounds,
+      missingBuiltInSounds,
+    };
+  }
+
   public getBuiltInSounds(): readonly ProducerTag[] {
-    return [...this.builtInSounds];
+    return this.builtInSounds.filter(
+      (sound) => !this.unavailableBuiltInSoundIds.has(sound.id),
+    );
   }
 
   public getUserSounds(): readonly ProducerTag[] {
@@ -84,7 +224,7 @@ export class SoundLibraryManager implements vscode.Disposable {
   }
 
   public getAllSounds(): readonly ProducerTag[] {
-    return [...this.builtInSounds, ...this.userSounds];
+    return [...this.getBuiltInSounds(), ...this.userSounds];
   }
 
   public findById(id: string): ProducerTag | undefined {
@@ -130,15 +270,40 @@ export class SoundLibraryManager implements vscode.Disposable {
       throw new Error("The selected path is not an audio file.");
     }
 
+    await fs.mkdir(this.managedSoundsDirectory, { recursive: true });
+    const contentHash = await this.hashFile(filePath);
+
+    if (
+      this.userSounds.some((sound) => sound.contentHash === contentHash)
+    ) {
+      throw new Error("That producer tag is already in your sound library.");
+    }
+
+    const id = `user-${randomUUID()}`;
+    const managedPath = path.join(
+      this.managedSoundsDirectory,
+      `${id}${extension}`,
+    );
     const sound: ProducerTag = {
-      id: `user-${randomUUID()}`,
+      id,
       name: path.basename(filePath, extension),
-      filePath: path.resolve(filePath),
+      filePath: path.resolve(managedPath),
       source: "user",
+      contentHash,
     };
 
-    this.userSounds = [...this.userSounds, sound];
-    await this.persistUserSounds();
+    await fs.copyFile(filePath, managedPath);
+
+    const nextSounds = [...this.userSounds, sound];
+
+    try {
+      await this.storage.update(userSoundsStorageKey, nextSounds);
+      this.userSounds = nextSounds;
+    } catch (error) {
+      await fs.rm(managedPath, { force: true }).catch(() => undefined);
+      throw error;
+    }
+
     this.changeEmitter.fire();
     return sound;
   }
@@ -150,13 +315,25 @@ export class SoundLibraryManager implements vscode.Disposable {
       throw new Error("Only user-added producer tags can be removed.");
     }
 
-    this.userSounds = this.userSounds.filter(
+    const nextSounds = this.userSounds.filter(
       (candidate) => candidate.id !== id,
     );
-    await this.persistUserSounds();
+    await this.storage.update(userSoundsStorageKey, nextSounds);
+    this.userSounds = nextSounds;
 
     if (this.settings.getSelectedSoundId() === id) {
-      await this.settings.setSelectedSoundId(undefined);
+      await this.settings.setSelectedSoundId(defaultSoundId);
+    }
+
+    if (this.isManagedSoundPath(sound.filePath)) {
+      try {
+        await fs.rm(sound.filePath, { force: true });
+      } catch (error) {
+        console.warn(
+          `Coder Tag: could not delete managed file for "${sound.name}".`,
+          error,
+        );
+      }
     }
 
     this.changeEmitter.fire();
@@ -190,11 +367,48 @@ export class SoundLibraryManager implements vscode.Disposable {
         typeof (value as ProducerTag).id === "string" &&
         typeof (value as ProducerTag).name === "string" &&
         typeof (value as ProducerTag).filePath === "string" &&
-        (value as ProducerTag).source === "user",
+        (value as ProducerTag).source === "user" &&
+        (
+          (value as ProducerTag).contentHash === undefined ||
+          typeof (value as ProducerTag).contentHash === "string"
+        ),
     );
   }
 
   private async persistUserSounds(): Promise<void> {
     await this.storage.update(userSoundsStorageKey, this.userSounds);
+  }
+
+  private async isReadableFile(filePath: string): Promise<boolean> {
+    try {
+      const stat = await fs.stat(filePath);
+      return stat.isFile();
+    } catch {
+      return false;
+    }
+  }
+
+  private isManagedSoundPath(filePath: string): boolean {
+    const relativePath = path.relative(
+      this.managedSoundsDirectory,
+      path.resolve(filePath),
+    );
+    return (
+      relativePath.length > 0 &&
+      !relativePath.startsWith(`..${path.sep}`) &&
+      relativePath !== ".." &&
+      !path.isAbsolute(relativePath)
+    );
+  }
+
+  private async hashFile(filePath: string): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      const hash = createHash("sha256");
+      const stream = createReadStream(filePath);
+
+      stream.on("error", reject);
+      stream.on("data", (chunk) => hash.update(chunk));
+      stream.on("end", () => resolve(hash.digest("hex")));
+    });
   }
 }

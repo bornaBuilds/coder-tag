@@ -30,13 +30,17 @@ export class StatusBarManager implements vscode.Disposable {
   }
 
   public update(): void {
+    const selectedSound = this.soundLibrary.getSelectedSound();
+
     if (!this.settings.isEnabled()) {
-      this.item.text = "$(mute) Tag: Disabled";
-      this.item.tooltip = "Coder Tag is disabled. Click for options.";
+      this.item.text = selectedSound
+        ? `$(mute) Tag: ${selectedSound.name} (Disabled)`
+        : "$(mute) Tag: Disabled";
+      this.item.tooltip = selectedSound
+        ? `Coder Tag is disabled. ${selectedSound.name} remains selected.`
+        : "Coder Tag is disabled. Click for options.";
       return;
     }
-
-    const selectedSound = this.soundLibrary.getSelectedSound();
 
     if (!selectedSound) {
       this.item.text = "$(unmute) Tag: Select Sound";

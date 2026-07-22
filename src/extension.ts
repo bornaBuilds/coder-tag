@@ -18,9 +18,11 @@ export async function activate(
   const settings = new SettingsManager();
   const soundLibrary = new SoundLibraryManager(
     context.extensionUri,
+    context.globalStorageUri,
     context.globalState,
     settings,
   );
+  const libraryInitialization = await soundLibrary.initialize();
   const audioPlayer = new PlatformAudioPlayer();
   const audioManager = new AudioManager(
     audioPlayer,
@@ -45,6 +47,33 @@ export async function activate(
   const statusBar = new StatusBarManager(settings, soundLibrary);
 
   commandManager.register();
+
+  if (
+    libraryInitialization.removedUserSounds > 0 ||
+    libraryInitialization.missingBuiltInSounds.length > 0
+  ) {
+    const issues: string[] = [];
+
+    if (libraryInitialization.removedUserSounds > 0) {
+      issues.push(
+        `${libraryInitialization.removedUserSounds} unavailable custom producer tag(s) were removed`,
+      );
+    }
+
+    if (libraryInitialization.missingBuiltInSounds.length > 0) {
+      issues.push(
+        `${libraryInitialization.missingBuiltInSounds.length} bundled producer tag(s) are missing; reinstall Coder Tag`,
+      );
+    }
+
+    void vscode.window
+      .showWarningMessage(`Coder Tag: ${issues.join(". ")}.`, "Add Sound")
+      .then(async (selection) => {
+        if (selection === "Add Sound") {
+          await vscode.commands.executeCommand("coderTag.addSound");
+        }
+      });
+  }
 
   const pushSubscription = pushDetector.onDidPush((event) => {
     void pushHandler.handlePush(event).catch((error: unknown) => {

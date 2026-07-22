@@ -13,6 +13,10 @@ interface MenuQuickPickItem extends vscode.QuickPickItem {
   readonly command: string;
 }
 
+interface VolumeQuickPickItem extends vscode.QuickPickItem {
+  readonly volume: number;
+}
+
 /**
  * Registers user commands and translates UI choices into manager calls.
  */
@@ -32,6 +36,8 @@ export class CommandManager implements vscode.Disposable {
     this.registerCommand("coderTag.addSound", () => this.addSound());
     this.registerCommand("coderTag.removeSound", () => this.removeSound());
     this.registerCommand("coderTag.toggleEnabled", () => this.toggleEnabled());
+    this.registerCommand("coderTag.setVolume", () => this.setVolume());
+    this.registerCommand("coderTag.openSettings", () => this.openSettings());
     this.registerCommand("coderTag.testPush", () => this.testPush());
     this.registerCommand("coderTag.showMenu", () => this.showMenu());
   }
@@ -119,7 +125,6 @@ export class CommandManager implements vscode.Disposable {
     const items: SoundQuickPickItem[] = sounds.map((sound) => ({
       label: sound.name,
       description: "User sound",
-      detail: sound.filePath,
       sound,
     }));
     const selection = await vscode.window.showQuickPick(items, {
@@ -156,6 +161,38 @@ export class CommandManager implements vscode.Disposable {
     );
   }
 
+  private async setVolume(): Promise<void> {
+    const currentVolume = this.settings.getVolume();
+    const levels = [0, 0.25, 0.5, 0.75, 1];
+    const items: VolumeQuickPickItem[] = levels.map((volume) => ({
+      label: `${Math.round(volume * 100)}%`,
+      description:
+        volume === currentVolume ? "Current volume" : undefined,
+      picked: volume === currentVolume,
+      volume,
+    }));
+    const selection = await vscode.window.showQuickPick(items, {
+      title: "Coder Tag Volume",
+      placeHolder: "Choose playback volume",
+    });
+
+    if (!selection) {
+      return;
+    }
+
+    await this.settings.setVolume(selection.volume);
+    void vscode.window.showInformationMessage(
+      `Coder Tag volume set to ${Math.round(selection.volume * 100)}%.`,
+    );
+  }
+
+  private async openSettings(): Promise<void> {
+    await vscode.commands.executeCommand(
+      "workbench.action.openSettings",
+      "@ext:bornaBuilds.coder-tag",
+    );
+  }
+
   private async testPush(): Promise<void> {
     await this.pushHandler.handlePush({
       source: "manual",
@@ -184,6 +221,14 @@ export class CommandManager implements vscode.Disposable {
         command: "coderTag.removeSound",
       },
       {
+        label: `$(settings) Volume: ${Math.round(this.settings.getVolume() * 100)}%`,
+        command: "coderTag.setVolume",
+      },
+      {
+        label: "$(gear) Settings",
+        command: "coderTag.openSettings",
+      },
+      {
         label: enabled ? "$(mute) Disable" : "$(unmute) Enable",
         command: "coderTag.toggleEnabled",
       },
@@ -208,12 +253,16 @@ export class CommandManager implements vscode.Disposable {
   private async pickSound(
     placeHolder: string,
   ): Promise<ProducerTag | undefined> {
+    const selectedId = this.settings.getSelectedSoundId();
     const items: SoundQuickPickItem[] = this.soundLibrary
       .getAllSounds()
       .map((sound) => ({
         label: `$(play) ${sound.name}`,
-        description: sound.source === "builtin" ? "Built-in" : "User sound",
-        detail: sound.source === "user" ? sound.filePath : undefined,
+        description: [
+          sound.source === "builtin" ? "Built-in" : "User sound",
+          sound.id === selectedId ? "Current" : undefined,
+        ].filter(Boolean).join(" • "),
+        picked: sound.id === selectedId,
         sound,
       }));
 

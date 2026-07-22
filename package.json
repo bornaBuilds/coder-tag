@@ -1,9 +1,26 @@
 {
   "name": "coder-tag",
   "displayName": "Coder Tag",
-  "description": "Play your own producer-tag-style sound when you publish code.",
+  "description": "Play a producer-tag-style sound after successful Git pushes.",
   "version": "0.0.1",
-  "publisher": "your-publisher-id",
+  "publisher": "bornaBuilds",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bornaBuilds/coder-tag.git"
+  },
+  "homepage": "https://github.com/bornaBuilds/coder-tag#readme",
+  "bugs": {
+    "url": "https://github.com/bornaBuilds/coder-tag/issues"
+  },
+  "keywords": [
+    "git",
+    "push",
+    "audio",
+    "sound",
+    "producer tag",
+    "source control"
+  ],
   "engines": {
     "vscode": "^1.93.0"
   },
@@ -17,6 +34,8 @@
     "onCommand:coderTag.addSound",
     "onCommand:coderTag.removeSound",
     "onCommand:coderTag.toggleEnabled",
+    "onCommand:coderTag.setVolume",
+    "onCommand:coderTag.openSettings",
     "onCommand:coderTag.testPush",
     "onCommand:coderTag.showMenu"
   ],
@@ -44,8 +63,20 @@
         "title": "Coder Tag: Toggle Enabled"
       },
       {
+        "command": "coderTag.setVolume",
+        "title": "Coder Tag: Set Volume"
+      },
+      {
+        "command": "coderTag.openSettings",
+        "title": "Coder Tag: Open Settings"
+      },
+      {
         "command": "coderTag.testPush",
         "title": "Coder Tag: Test Push"
+      },
+      {
+        "command": "coderTag.showMenu",
+        "title": "Coder Tag: Open Menu"
       }
     ],
     "configuration": {
@@ -54,34 +85,45 @@
         "coderTag.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable or disable playing the selected producer tag for push events."
+          "scope": "application",
+          "order": 10,
+          "description": "Play the selected producer tag after successful push events."
         },
         "coderTag.selectedSound": {
           "type": "string",
-          "default": "",
-          "description": "The ID of the selected producer tag. Use the Select Producer Tag command to change it."
+          "default": "builtin-demo-1",
+          "scope": "application",
+          "order": 20,
+          "description": "The selected producer tag ID. Use the Coder Tag: Select Producer Tag command instead of editing this value directly."
         },
         "coderTag.volume": {
           "type": "number",
           "default": 1,
           "minimum": 0,
           "maximum": 1,
+          "multipleOf": 0.05,
+          "scope": "application",
+          "order": 30,
           "description": "Playback volume from 0 (silent) to 1 (full volume)."
         },
         "coderTag.syncCountsAsPush": {
           "type": "boolean",
           "default": true,
+          "scope": "application",
+          "order": 40,
           "description": "Play the producer tag when using the Source Control Sync button or auto-sync (a pull followed by a push). Because VS Code runs a push on every sync, this may also play when a sync had nothing to push. Disable to play only on an explicit push."
         }
       }
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run build",
+    "clean": "node scripts/clean.mjs",
+    "build": "npm run clean && npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "generate-demo-sounds": "node scripts/generateDemoSounds.mjs",
-    "pretest": "npm run compile && npm run lint",
+    "pretest": "npm run build && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test"
   },
@@ -91,6 +133,7 @@
     "@types/vscode": "^1.93.0",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.0.0",
+    "@vscode/vsce": "^3.9.2",
     "eslint": "^10.5.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.61.1"
