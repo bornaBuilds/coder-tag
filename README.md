@@ -49,6 +49,10 @@ Click the Coder Tag status bar item to open a menu containing these actions.
 - `coderTag.selectedSound`: stores the selected sound ID. Prefer the Select
   Producer Tag command instead of editing this value manually.
 - `coderTag.volume`: playback volume from `0` to `1`.
+- `coderTag.syncCountsAsPush`: when enabled (the default), the Source Control
+  Sync button and auto-sync also play the tag. Because VS Code runs a push on
+  every sync, this can also play when a sync had nothing to push; disable it to
+  play only on an explicit push.
 
 Settings and user-added sound metadata persist across restarts. Built-in sounds
 are resolved relative to the installed extension. User sounds keep their
@@ -56,30 +60,50 @@ original absolute paths for this MVP.
 
 ## Git Push Detection
 
-All events use one pipeline:
+Coder Tag automatically detects a **successful** `git push` and plays your
+selected tag. There are no git hooks to install and no per-project setup.
+
+All events flow through one pipeline:
 
 ```text
-PushDetector or Test Push command
-              |
-              v
-          PushHandler
-              |
-              v
-         AudioManager
-              |
-              v
-       Selected Producer Tag
+Terminal push / Source Control push / First-time publish / Test Push
+                          |
+                          v
+                 CompositePushDetector
+                          |
+                          v
+                     PushHandler
+                          |
+                          v
+                     AudioManager
+                          |
+                          v
+                Selected Producer Tag
 ```
 
-The VS Code 1.93 public Git API does not expose a general successful-push event.
-Coder Tag uses only the verified `gitAPI.onDidPublish` event, which fires when
-VS Code publishes a repository or branch for the first time. It does not call
-the unsupported `onDidRunOperation` method and does not treat remote-tracking
-ref changes as proof of a push.
+Detection combines three complementary, built-in signals — all cross-platform
+(Windows/macOS/Linux) and all reporting real success or failure:
 
-Use **Coder Tag: Test Push** to reliably exercise ordinary push behavior in V1.
-The command respects `coderTag.enabled` and uses exactly the same `PushHandler`
-as automatic publish events.
+- **Integrated terminal.** The Terminal Shell Integration API
+  (`window.onDidEndTerminalShellExecution`, stable since VS Code 1.93) detects
+  `git push` typed in VS Code's integrated terminal and plays only when the
+  command exits successfully (exit code `0`).
+- **Source Control UI.** The git extension's per-repository operation event —
+  the same signal VS Code uses for its "Successfully pushed" notification —
+  detects pushes from the Source Control panel and the `Git: Push` command,
+  firing on a successful `Push` operation. This uses an internal API that is
+  accessed defensively; if it is ever unavailable, the other detectors keep
+  working. The Source Control **Sync** button and auto-sync (a pull followed by
+  a push) are also detected when `coderTag.syncCountsAsPush` is enabled (the
+  default); see Settings.
+- **First-time publish.** The public `gitAPI.onDidPublish` event.
+
+A short de-duplication window keeps a single push from playing the tag twice
+when two signals observe it (for example, a first-time publish).
+
+Use **Coder Tag: Test Push** to exercise the audio path without pushing. It
+respects `coderTag.enabled` and uses exactly the same `PushHandler` as
+automatic events.
 
 ## Bundled Demo Sounds
 
@@ -133,12 +157,18 @@ The generated `.vsix` can be installed with **Extensions: Install from VSIX**.
 
 ## Current MVP Limitations
 
-- Ordinary `git push` commands are not automatically detected because the
-  supported Git and terminal APIs available to this extension cannot identify
-  them reliably. Terminal aliases, external terminals, and other Git clients
-  make command interception incomplete.
-- Automatic playback currently covers only VS Code's first-time Git publish
-  event. Test Push is the reliable test path.
+- Only pushes made through VS Code are detected: its integrated terminal, the
+  Source Control UI, and publish events. Pushes from an **external** terminal
+  (outside VS Code) or from another Git client/GUI are not detected.
+- Terminal detection requires VS Code's shell integration to be active for the
+  shell in use (automatic for bash, zsh, fish, PowerShell, and Git Bash). Shell
+  aliases such as a `gp` alias for `git push` are not recognized, because the
+  extension matches the command text that was run.
+- Source Control UI push detection relies on an internal git-extension API. If a
+  future VS Code release changes it, terminal and publish detection continue to
+  work.
+- Only `git push` is detected today. Support for pull/merge/fetch is planned and
+  the detection layer is structured to add them.
 - MP3 codec support can vary when Linux falls back from `ffplay` to the
   desktop audio utilities.
 - Playback requires an audio device in the environment where the extension

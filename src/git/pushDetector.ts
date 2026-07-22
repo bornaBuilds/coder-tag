@@ -1,7 +1,11 @@
 import * as vscode from "vscode";
 import { GitManager } from "./gitManager";
 
-export type PushEventSource = "git-publish" | "manual";
+export type PushEventSource =
+  | "git-publish"
+  | "git-operation"
+  | "terminal"
+  | "manual";
 
 /**
  * A normalized event consumed by PushHandler, regardless of where the event
