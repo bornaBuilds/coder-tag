@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { SoundPlayAudioPlayer } from "./audio/audioPlayer";
+import { PlatformAudioPlayer } from "./audio/audioPlayer";
 import { AudioManager } from "./audio/audioManager";
 import { CommandManager } from "./commands/commands";
 import { GitManager } from "./git/gitManager";
@@ -18,7 +18,7 @@ export async function activate(
     context.globalState,
     settings,
   );
-  const audioPlayer = new SoundPlayAudioPlayer();
+  const audioPlayer = new PlatformAudioPlayer();
   const audioManager = new AudioManager(
     audioPlayer,
     settings,

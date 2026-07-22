@@ -1,12 +1,41 @@
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { AudioPlayer } from "./audioPlayer";
+import { AudioPlaybackError, AudioPlayer } from "./audioPlayer";
 import { SettingsManager } from "../settings/settings";
 import { ProducerTag } from "../sounds/producerTag";
 import { SoundLibraryManager } from "../sounds/soundLibraryManager";
 
 const supportedExtensions = new Set([".mp3", ".wav"]);
+
+export function getPlaybackErrorMessage(error: unknown): string {
+  if (getErrorCode(error) === "ENOENT") {
+    return "The selected audio file could not be found.";
+  }
+
+  if (
+    error instanceof AudioPlaybackError &&
+    (error.code === "NO_AUDIO_BACKEND" ||
+      error.code === "UNSUPPORTED_PLATFORM")
+  ) {
+    return error.message;
+  }
+
+  return "The selected audio file could not be played.";
+}
+
+function getErrorCode(error: unknown): string | undefined {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+  ) {
+    return error.code;
+  }
+
+  return undefined;
+}
 
 /**
  * Coordinates sound selection, settings, validation, and the AudioPlayer.
@@ -60,25 +89,7 @@ export class AudioManager {
       await this.player.play(sound.filePath, this.settings.getVolume());
     } catch (error) {
       console.error(`Coder Tag: could not play "${sound.name}".`, error);
-
-      const message =
-        this.getErrorCode(error) === "ENOENT"
-          ? "The selected audio file could not be found."
-          : "The selected audio file could not be played.";
-      void vscode.window.showErrorMessage(message);
+      void vscode.window.showErrorMessage(getPlaybackErrorMessage(error));
     }
-  }
-
-  private getErrorCode(error: unknown): string | undefined {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      typeof error.code === "string"
-    ) {
-      return error.code;
-    }
-
-    return undefined;
   }
 }

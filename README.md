@@ -96,6 +96,26 @@ development assets, place MP3 or WAV files in `media/` and update the built-in
 entries in `src/sounds/soundLibraryManager.ts`. Do not use copyrighted producer
 tags unless you have permission to distribute them.
 
+## Audio Playback Support
+
+Coder Tag launches the host operating system's audio tools directly. It does
+not pass file paths through a command shell, and starting a new producer tag
+stops the one currently playing.
+
+- macOS uses the built-in `/usr/bin/afplay` player.
+- Windows uses PowerShell and the built-in PresentationCore media player.
+- Linux tries `ffplay`, `pw-play`, `paplay`, and then `aplay`, in that order.
+
+For the broadest Linux MP3/WAV and volume support, install FFmpeg so `ffplay`
+is available. PipeWire's `pw-play` and PulseAudio's `paplay` are supported
+fallbacks. ALSA's `aplay` is used only for WAV files and plays at the system
+mixer volume rather than applying `coderTag.volume`.
+
+If Linux reports that no audio backend is available, install one of those
+players and restart the extension host. Audio runs on the machine hosting the
+extension process, so Remote SSH, containers, and WSL need audio configured in
+that environment.
+
 ## Packaging
 
 1. Replace `your-publisher-id` in `package.json` with your Visual Studio
@@ -119,9 +139,10 @@ The generated `.vsix` can be installed with **Extensions: Install from VSIX**.
   make command interception incomplete.
 - Automatic playback currently covers only VS Code's first-time Git publish
   event. Test Push is the reliable test path.
-- `sound-play` depends on operating-system playback facilities. MP3/WAV codec
-  support can vary by system.
-- `sound-play` has no reliable cross-platform stop API, so `stop()` is a no-op.
+- MP3 codec support can vary when Linux falls back from `ffplay` to the
+  desktop audio utilities.
+- Playback requires an audio device in the environment where the extension
+  host is running.
 - User sound paths are absolute. Moving or deleting a file makes it unavailable
   until it is re-added.
 - The extension does not yet download online sound packs.
