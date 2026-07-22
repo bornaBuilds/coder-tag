@@ -2,9 +2,12 @@ import * as vscode from "vscode";
 import { PlatformAudioPlayer } from "./audio/audioPlayer";
 import { AudioManager } from "./audio/audioManager";
 import { CommandManager } from "./commands/commands";
+import { CompositePushDetector } from "./git/compositePushDetector";
 import { GitManager } from "./git/gitManager";
+import { GitOperationPushDetector } from "./git/gitOperationPushDetector";
 import { GitPublishPushDetector } from "./git/pushDetector";
 import { PushHandler } from "./git/pushHandler";
+import { TerminalPushDetector } from "./git/terminalPushDetector";
 import { SettingsManager } from "./settings/settings";
 import { SoundLibraryManager } from "./sounds/soundLibraryManager";
 import { StatusBarManager } from "./ui/statusBar";
@@ -25,7 +28,13 @@ export async function activate(
     soundLibrary,
   );
   const gitManager = new GitManager();
-  const pushDetector = new GitPublishPushDetector(gitManager);
+  const pushDetector = new CompositePushDetector([
+    new GitPublishPushDetector(gitManager),
+    new GitOperationPushDetector(gitManager, {
+      includeSync: () => settings.syncCountsAsPush(),
+    }),
+    new TerminalPushDetector(gitManager),
+  ]);
   const pushHandler = new PushHandler(audioManager);
   const commandManager = new CommandManager(
     audioManager,

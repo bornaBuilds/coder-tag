@@ -49,6 +49,10 @@ export class SettingsManager implements vscode.Disposable {
     return Math.min(1, Math.max(0, volume));
   }
 
+  public syncCountsAsPush(): boolean {
+    return this.configuration.get<boolean>("syncCountsAsPush", true);
+  }
+
   public async setVolume(volume: number): Promise<void> {
     const safeVolume = Math.min(1, Math.max(0, volume));
     await this.configuration.update(

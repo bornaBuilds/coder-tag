@@ -67,6 +67,11 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Playback volume from 0 (silent) to 1 (full volume)."
+        },
+        "coderTag.syncCountsAsPush": {
+          "type": "boolean",
+          "default": true,
+          "description": "Play the producer tag when using the Source Control Sync button or auto-sync (a pull followed by a push). Because VS Code runs a push on every sync, this may also play when a sync had nothing to push. Disable to play only on an explicit push."
         }
       }
     }
