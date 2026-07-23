@@ -3,6 +3,24 @@
 All notable changes to Coder Tag are documented in this file. This project
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Added an automatic macOS terminal fallback that receives local Git Trace2
+  lifecycle events over a private Unix socket. This detects successful
+  `git push` commands when VS Code's zsh shell-execution completion event is
+  missing, including affected Powerlevel10k setups.
+- Added `coderTag.macOSTerminalFallback` as a default-on opt-out setting. Trace
+  records are processed only in memory, raw arguments are not stored or logged,
+  and existing `GIT_TRACE2_EVENT` or `trace2.eventTarget` destinations are not
+  replaced.
+
+### Changed
+
+- Made push de-duplication source-aware so overlapping terminal signals are
+  collapsed one-to-one without suppressing legitimate rapid pushes.
+
 ## [0.0.2] - 2026-07-23
 
 ### Added

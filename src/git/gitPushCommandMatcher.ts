@@ -22,6 +22,16 @@ const GIT_GLOBAL_OPTIONS_WITH_VALUE = new Set([
   "--exec-path",
 ]);
 
+const GIT_INFORMATION_OPTIONS = new Set([
+  "-h",
+  "-v",
+  "--help",
+  "--version",
+  "--html-path",
+  "--man-path",
+  "--info-path",
+]);
+
 export function isGitPushCommand(commandLine: string): boolean {
   if (!commandLine || commandLine.trim().length === 0) {
     return false;
@@ -56,6 +66,14 @@ function segmentIsGitPush(segment: string): boolean {
   const head = segment.split("|")[0].trim();
   const tokens = head.split(/\s+/).filter((token) => token.length > 0);
 
+  return isGitPushArgv(tokens);
+}
+
+/**
+ * Array-based counterpart used when Git itself reports argv through Trace2.
+ * Keeping this path token-aware avoids lossy shell quoting and escaping.
+ */
+export function isGitPushArgv(tokens: readonly string[]): boolean {
   if (tokens.length < 2) {
     return false;
   }
@@ -70,6 +88,10 @@ function segmentIsGitPush(segment: string): boolean {
 
     if (!token.startsWith("-")) {
       break;
+    }
+
+    if (GIT_INFORMATION_OPTIONS.has(token)) {
+      return false;
     }
 
     if (GIT_GLOBAL_OPTIONS_WITH_VALUE.has(token)) {

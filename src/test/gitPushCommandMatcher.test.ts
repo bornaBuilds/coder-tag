@@ -1,5 +1,8 @@
 import * as assert from "node:assert";
-import { isGitPushCommand } from "../git/gitPushCommandMatcher";
+import {
+  isGitPushArgv,
+  isGitPushCommand,
+} from "../git/gitPushCommandMatcher";
 
 suite("isGitPushCommand", () => {
   const positives = [
@@ -35,6 +38,11 @@ suite("isGitPushCommand", () => {
     "mygit push",
     "git push --help",
     "git push -h",
+    "git --version push",
+    "git -v push",
+    "git --help push",
+    "git -h push",
+    "git --html-path push",
   ];
 
   for (const commandLine of positives) {
@@ -48,4 +56,21 @@ suite("isGitPushCommand", () => {
       assert.strictEqual(isGitPushCommand(commandLine), false);
     });
   }
+});
+
+suite("isGitPushArgv", () => {
+  test("matches tokenized push invocations", () => {
+    assert.strictEqual(isGitPushArgv(["git", "push"]), true);
+    assert.strictEqual(
+      isGitPushArgv(["/usr/bin/git", "-C", "/repo path", "push", "origin"]),
+      true,
+    );
+  });
+
+  test("rejects non-push and help invocations", () => {
+    assert.strictEqual(isGitPushArgv(["git", "status"]), false);
+    assert.strictEqual(isGitPushArgv(["git", "push", "--help"]), false);
+    assert.strictEqual(isGitPushArgv(["git", "--version", "push"]), false);
+    assert.strictEqual(isGitPushArgv(["git", "-v", "push"]), false);
+  });
 });

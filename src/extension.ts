@@ -5,12 +5,15 @@ import { CommandManager } from "./commands/commands";
 import { CompositePushDetector } from "./git/compositePushDetector";
 import { GitManager } from "./git/gitManager";
 import { GitOperationPushDetector } from "./git/gitOperationPushDetector";
+import { MacosTrace2PushDetector } from "./git/macosTrace2PushDetector";
 import { GitPublishPushDetector } from "./git/pushDetector";
 import { PushHandler } from "./git/pushHandler";
 import { TerminalPushDetector } from "./git/terminalPushDetector";
 import { SettingsManager } from "./settings/settings";
 import { SoundLibraryManager } from "./sounds/soundLibraryManager";
 import { StatusBarManager } from "./ui/statusBar";
+
+let activeMacosTrace2Detector: MacosTrace2PushDetector | undefined;
 
 export async function activate(
   context: vscode.ExtensionContext,
@@ -30,12 +33,22 @@ export async function activate(
     soundLibrary,
   );
   const gitManager = new GitManager();
+  const macosTrace2Detector = new MacosTrace2PushDetector(
+    context.environmentVariableCollection,
+    gitManager,
+    {
+      isEnabled: () => settings.macOSTerminalFallbackEnabled(),
+      onDidChangeEnabled: settings.onDidChange,
+    },
+  );
+  activeMacosTrace2Detector = macosTrace2Detector;
   const pushDetector = new CompositePushDetector([
     new GitPublishPushDetector(gitManager),
     new GitOperationPushDetector(gitManager, {
       includeSync: () => settings.syncCountsAsPush(),
     }),
     new TerminalPushDetector(gitManager),
+    macosTrace2Detector,
   ]);
   const pushHandler = new PushHandler(audioManager);
   const commandManager = new CommandManager(
@@ -95,4 +108,7 @@ export async function activate(
   console.log("Coder Tag extension activated.");
 }
 
-export function deactivate() {}
+export async function deactivate(): Promise<void> {
+  await activeMacosTrace2Detector?.shutdown();
+  activeMacosTrace2Detector = undefined;
+}

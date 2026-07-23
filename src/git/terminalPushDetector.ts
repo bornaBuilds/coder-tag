@@ -55,20 +55,26 @@ export class TerminalPushDetector implements PushDetector, vscode.Disposable {
       return;
     }
 
+    const repository = this.resolveRepository(event.execution.cwd);
     this.pushEmitter.fire({
       source: "terminal",
       timestamp: Date.now(),
-      repositoryRoot: this.resolveRepositoryRoot(event.execution.cwd),
+      repositoryRoot: repository?.root,
+      repositoryRootIsExact: repository?.exact,
     });
   }
 
-  private resolveRepositoryRoot(cwd: vscode.Uri | undefined): string | undefined {
+  private resolveRepository(
+    cwd: vscode.Uri | undefined,
+  ): { readonly root: string; readonly exact: boolean } | undefined {
     if (!cwd) {
       return undefined;
     }
 
-    const repositoryRoot = this.gitManager?.getModel()?.getRepository(cwd)?.root;
-    return repositoryRoot ?? cwd.fsPath;
+    const repositoryRoot = this.gitManager?.findRepositoryRoot(cwd);
+    return repositoryRoot
+      ? { root: repositoryRoot, exact: true }
+      : { root: cwd.fsPath, exact: false };
   }
 
   public stop(): void {

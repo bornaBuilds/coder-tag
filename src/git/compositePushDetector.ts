@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "node:path";
 import { PushDetector, PushEvent } from "./pushDetector";
 
 export interface CompositePushDetectorOptions {
@@ -7,21 +8,26 @@ export interface CompositePushDetectorOptions {
 }
 
 const DEFAULT_DEDUPE_WINDOW_MS = 1500;
-const UNKNOWN_REPOSITORY_KEY = "<unknown>";
+
+interface RecentPush {
+  readonly repositoryRoot: string;
+  readonly repositoryRootIsExact: boolean;
+  readonly source: PushEvent["source"];
+  readonly timestamp: number;
+}
 
 /**
  * Fans several push detectors into a single stream and suppresses duplicate
  * events for the same repository within a short window.
  *
- * The one real overlap is a first-time publish, which surfaces as both a
- * "git-operation" Push and a "git-publish" event for the same repository root.
- * Terminal and git-operation events never overlap, because the git extension
- * only emits `onDidRunOperation` for operations it runs itself, not for raw
- * terminal commands.
+ * Known overlaps are paired one-to-one: first-time publish can surface as both
+ * git-operation and git-publish, while a terminal push can surface through
+ * both shell integration and the macOS Trace2 fallback. Repeated events from
+ * one source remain distinct.
  */
 export class CompositePushDetector implements PushDetector, vscode.Disposable {
   private readonly pushEmitter = new vscode.EventEmitter<PushEvent>();
-  private readonly lastFiredByRepository = new Map<string, number>();
+  private recentPushes: RecentPush[] = [];
   private childSubscriptions: vscode.Disposable[] = [];
   private readonly dedupeWindowMs: number;
   private readonly now: () => number;
@@ -54,15 +60,38 @@ export class CompositePushDetector implements PushDetector, vscode.Disposable {
   }
 
   private handleChildPush(event: PushEvent): void {
-    const key = event.repositoryRoot ?? UNKNOWN_REPOSITORY_KEY;
     const now = this.now();
-    const lastFired = this.lastFiredByRepository.get(key);
+    const repositoryRoot = normalizeRepositoryKey(event.repositoryRoot);
+    this.recentPushes = this.recentPushes.filter((entry) =>
+      now - entry.timestamp < this.dedupeWindowMs
+    );
 
-    if (lastFired !== undefined && now - lastFired < this.dedupeWindowMs) {
-      return;
+    if (repositoryRoot) {
+      const counterpartIndex = this.recentPushes.findIndex((entry) =>
+        sourcesOverlap(entry.source, event.source) &&
+        repositoriesOverlap(
+          entry.repositoryRoot,
+          repositoryRoot,
+          entry.repositoryRootIsExact,
+          event.repositoryRootIsExact === true,
+          entry.source,
+          event.source,
+        )
+      );
+
+      if (counterpartIndex !== -1) {
+        this.recentPushes.splice(counterpartIndex, 1);
+        return;
+      }
+
+      this.recentPushes.push({
+        repositoryRoot,
+        repositoryRootIsExact: event.repositoryRootIsExact === true,
+        source: event.source,
+        timestamp: now,
+      });
     }
 
-    this.lastFiredByRepository.set(key, now);
     this.pushEmitter.fire(event);
   }
 
@@ -76,7 +105,7 @@ export class CompositePushDetector implements PushDetector, vscode.Disposable {
       child.stop();
     }
 
-    this.lastFiredByRepository.clear();
+    this.recentPushes = [];
     this.started = false;
   }
 
@@ -91,6 +120,68 @@ export class CompositePushDetector implements PushDetector, vscode.Disposable {
 
     this.pushEmitter.dispose();
   }
+}
+
+function normalizeRepositoryKey(
+  repositoryRoot: string | undefined,
+): string | undefined {
+  return repositoryRoot ? path.resolve(repositoryRoot) : undefined;
+}
+
+function sourcesOverlap(
+  first: PushEvent["source"],
+  second: PushEvent["source"],
+): boolean {
+  return (
+    (first === "terminal" && second === "terminal-trace2") ||
+    (first === "terminal-trace2" && second === "terminal") ||
+    (first === "git-operation" && second === "git-publish") ||
+    (first === "git-publish" && second === "git-operation")
+  );
+}
+
+function repositoriesOverlap(
+  firstRoot: string,
+  secondRoot: string,
+  firstRootIsExact: boolean,
+  secondRootIsExact: boolean,
+  firstSource: PushEvent["source"],
+  secondSource: PushEvent["source"],
+): boolean {
+  if (firstRoot === secondRoot) {
+    return true;
+  }
+
+  if (
+    (firstSource === "terminal" && secondSource === "terminal-trace2") ||
+    (firstSource === "terminal-trace2" && secondSource === "terminal")
+  ) {
+    const terminalRoot =
+      firstSource === "terminal" ? firstRoot : secondRoot;
+    const terminalRootIsExact =
+      firstSource === "terminal" ? firstRootIsExact : secondRootIsExact;
+    const traceRoot =
+      firstSource === "terminal-trace2" ? firstRoot : secondRoot;
+
+    return (
+      !terminalRootIsExact &&
+      isSameOrDescendant(terminalRoot, traceRoot)
+    );
+  }
+
+  return false;
+}
+
+function isSameOrDescendant(candidate: string, parent: string): boolean {
+  const relative = path.relative(parent, candidate);
+  return (
+    relative === "" ||
+    (
+      relative !== ".." &&
+      !relative.startsWith(`..${path.sep}`) &&
+      !path.isAbsolute(relative)
+    )
+  );
 }
 
 function isDisposable(value: unknown): value is vscode.Disposable {
