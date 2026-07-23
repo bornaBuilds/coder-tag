@@ -3,7 +3,7 @@
 All notable changes to Coder Tag are documented in this file. This project
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.0.3] - 2026-07-23
 
 ### Added
 
