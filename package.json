@@ -3,7 +3,7 @@
   "name": "coder-tag",
   "displayName": "Coder Tag",
   "description": "Play a producer-tag-style sound after successful Git pushes.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "bornaBuilds",
   "license": "MIT",
   "repository": {

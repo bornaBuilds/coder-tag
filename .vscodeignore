@@ -7,6 +7,7 @@ scripts/**
 src/**
 .gitignore
 .yarnrc
+ROADMAP.md
 vsc-extension-quickstart.md
 **/tsconfig.json
 **/eslint.config.mjs

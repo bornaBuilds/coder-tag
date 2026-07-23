@@ -1,8 +1,21 @@
 # Coder Tag
 
+[![CI](https://github.com/bornaBuilds/coder-tag/actions/workflows/ci.yml/badge.svg)](https://github.com/bornaBuilds/coder-tag/actions/workflows/ci.yml)
+[![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/bornaBuilds.coder-tag)](https://marketplace.visualstudio.com/items?itemName=bornaBuilds.coder-tag)
+
 Coder Tag is a VS Code/Cursor extension that plays a producer-tag-style audio
 clip after a successful Git push. It includes seven bundled sounds and supports
 user-added MP3 and WAV files.
+
+## Installation
+
+Install **Coder Tag** from the
+[Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=bornaBuilds.coder-tag)
+or search for `Coder Tag` in the Extensions view.
+
+To install a packaged build manually, download the VSIX artifact from a
+**Package Extension** workflow run, then run **Extensions: Install from VSIX**
+in VS Code or Cursor.
 
 ## Features
 
@@ -99,7 +112,9 @@ Detection combines three complementary, built-in signals — all cross-platform
 - **Integrated terminal.** The Terminal Shell Integration API
   (`window.onDidEndTerminalShellExecution`, stable since VS Code 1.93) detects
   `git push` typed in VS Code's integrated terminal and plays only when the
-  command exits successfully (exit code `0`).
+  command exits successfully (exit code `0`). Command lines reported with low
+  confidence are still checked by the strict Git command matcher, which keeps
+  terminal detection working with customized zsh prompts.
 - **Source Control UI.** The git extension's per-repository operation event —
   the same signal VS Code uses for its "Successfully pushed" notification —
   detects pushes from the Source Control panel and the `Git: Push` command,
@@ -116,6 +131,26 @@ when two signals observe it (for example, a first-time publish).
 Use **Coder Tag: Test Push** to exercise the audio path without pushing. It
 respects `coderTag.enabled` and uses exactly the same `PushHandler` as
 automatic events.
+
+### Terminal and zsh troubleshooting
+
+Terminal detection depends on VS Code shell integration. Hover the terminal tab
+and check that **Shell Integration** reports **Rich** or **Basic**. Open a new
+terminal after changing shell settings or installing a new extension build.
+
+Complex zsh configurations can prevent automatic shell-integration injection.
+If needed, disable `terminal.integrated.shellIntegration.enabled` and add the
+official manual integration line to `~/.zshrc`:
+
+```zsh
+[[ "$TERM_PROGRAM" == "vscode" ]] && . "$(code --locate-shell-integration-path zsh)"
+```
+
+Restart the terminal after editing `.zshrc`. Shell aliases such as `gp` are not
+detected; use an explicit `git push`. A VS Code zsh shell-integration issue can
+also prevent the terminal completion event from firing. In that case Coder Tag
+cannot confirm that the push succeeded; Source Control pushes and
+**Coder Tag: Test Push** remain available.
 
 ## Bundled Sounds
 
@@ -158,17 +193,29 @@ that environment.
 
 ## Packaging
 
-1. Install dependencies.
-2. Compile, lint, and test the extension.
-3. Build the package:
+### Package locally
 
 ```sh
 npm ci
 npm test
-npm exec vsce package
+npm exec vsce package -- --no-yarn
 ```
 
 The generated `.vsix` can be installed with **Extensions: Install from VSIX**.
+
+### Package with GitHub Actions
+
+The **Package Extension** workflow:
+
+- Runs manually from **Actions → Package Extension → Run workflow**.
+- Runs automatically when a version tag such as `v0.0.2` is pushed.
+- Installs dependencies, compiles, lints, runs the extension tests, and packages
+  `coder-tag-<version>.vsix`.
+- Uploads the VSIX as a workflow artifact for 30 days.
+
+For tag-triggered builds, update `package.json` and `CHANGELOG.md` first. The
+workflow rejects a tag that does not match the extension version. Packaging
+does not publish to the Marketplace and requires no Marketplace token.
 
 ## Current MVP Limitations
 

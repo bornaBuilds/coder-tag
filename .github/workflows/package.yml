@@ -1,0 +1,64 @@
+name: Package Extension
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile, lint, and test
+        run: xvfb-run -a npm test
+
+      - name: Read extension version
+        id: version
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "vsix=coder-tag-$version.vsix" >> "$GITHUB_OUTPUT"
+
+      - name: Verify version tag
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          EXTENSION_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          expected_tag="v$EXTENSION_VERSION"
+          if [[ "$GITHUB_REF_NAME" != "$expected_tag" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $EXTENSION_VERSION (expected $expected_tag)."
+            exit 1
+          fi
+
+      - name: Package extension
+        env:
+          VSIX_NAME: ${{ steps.version.outputs.vsix }}
+        run: npm exec vsce package -- --no-yarn --out "$VSIX_NAME"
+
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v7
+        with:
+          name: coder-tag-${{ steps.version.outputs.version }}
+          path: ${{ steps.version.outputs.vsix }}
+          if-no-files-found: error
+          retention-days: 30

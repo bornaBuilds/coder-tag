@@ -47,15 +47,10 @@ export class TerminalPushDetector implements PushDetector, vscode.Disposable {
 
     const commandLine = event.execution.commandLine;
 
-    // Low confidence means the reported text is unreliable; matching it would
-    // risk false positives.
-    if (
-      commandLine.confidence ===
-      vscode.TerminalShellExecutionCommandLineConfidence.Low
-    ) {
-      return;
-    }
-
+    // Low-confidence command lines are read from the terminal buffer rather
+    // than reported explicitly by the shell. This is common with customized
+    // zsh prompts, so do not reject them outright; the strict command matcher
+    // below still requires an actual `git push` invocation.
     if (!isGitPushCommand(commandLine.value)) {
       return;
     }

@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  test-and-package:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -29,12 +29,3 @@ jobs:
 
       - name: Compile, lint, and test
         run: xvfb-run -a npm test
-
-      - name: Package extension
-        run: npm exec vsce package -- --no-yarn --out coder-tag.vsix
-
-      - name: Upload VSIX
-        uses: actions/upload-artifact@v7
-        with:
-          name: coder-tag-vsix
-          path: coder-tag.vsix
