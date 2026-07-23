@@ -113,6 +113,13 @@
           "scope": "application",
           "order": 40,
           "description": "Play the producer tag when using the Source Control Sync button or auto-sync (a pull followed by a push). Because VS Code runs a push on every sync, this may also play when a sync had nothing to push. Disable to play only on an explicit push."
+        },
+        "coderTag.macOSTerminalFallback": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "order": 50,
+          "description": "On macOS, enable shell-independent detection for Git pushes from newly created integrated terminals. Git lifecycle records are streamed to Coder Tag over a private local socket, processed in memory, and never stored or logged. The fallback stays disabled if GIT_TRACE2_EVENT or trace2.eventTarget is already configured."
         }
       }
     }

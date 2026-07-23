@@ -5,6 +5,7 @@ export type PushEventSource =
   | "git-publish"
   | "git-operation"
   | "terminal"
+  | "terminal-trace2"
   | "manual";
 
 /**
@@ -15,6 +16,8 @@ export interface PushEvent {
   readonly source: PushEventSource;
   readonly timestamp: number;
   readonly repositoryRoot?: string;
+  /** False when repositoryRoot is only the terminal cwd fallback. */
+  readonly repositoryRootIsExact?: boolean;
   readonly branch?: string;
 }
 
@@ -58,6 +61,7 @@ export class GitPublishPushDetector implements PushDetector, vscode.Disposable {
         source: "git-publish",
         timestamp: Date.now(),
         repositoryRoot: event.repository.rootUri.fsPath,
+        repositoryRootIsExact: true,
         branch: event.branch,
       });
     });

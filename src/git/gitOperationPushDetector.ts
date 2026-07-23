@@ -109,6 +109,7 @@ export class GitOperationPushDetector
           source: "git-operation",
           timestamp: Date.now(),
           repositoryRoot: base.root,
+          repositoryRootIsExact: base.root !== undefined,
           branch: base.HEAD?.name,
         });
       });

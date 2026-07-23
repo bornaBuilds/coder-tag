@@ -1,7 +1,11 @@
 import * as assert from "node:assert";
 import * as vscode from "vscode";
 import { CompositePushDetector } from "../git/compositePushDetector";
-import { PushDetector, PushEvent } from "../git/pushDetector";
+import {
+  PushDetector,
+  PushEvent,
+  PushEventSource,
+} from "../git/pushDetector";
 
 class FakeDetector implements PushDetector, vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<PushEvent>();
@@ -26,8 +30,17 @@ class FakeDetector implements PushDetector, vscode.Disposable {
   }
 }
 
-function pushEvent(repositoryRoot: string | undefined): PushEvent {
-  return { source: "git-operation", timestamp: 0, repositoryRoot };
+function pushEvent(
+  repositoryRoot: string | undefined,
+  source: PushEventSource = "git-operation",
+  repositoryRootIsExact = true,
+): PushEvent {
+  return {
+    source,
+    timestamp: 0,
+    repositoryRoot,
+    repositoryRootIsExact,
+  };
 }
 
 suite("CompositePushDetector", () => {
@@ -49,7 +62,7 @@ suite("CompositePushDetector", () => {
     assert.ok(first.stopped && second.stopped);
   });
 
-  test("suppresses duplicate events for the same repo within the window", async () => {
+  test("suppresses known cross-source pairs one-to-one", async () => {
     let clock = 1000;
     const child = new FakeDetector();
     const composite = new CompositePushDetector([child], {
@@ -61,15 +74,102 @@ suite("CompositePushDetector", () => {
 
     await composite.start();
 
-    child.emit(pushEvent("/repo"));
-    clock += 500; // within the window
-    child.emit(pushEvent("/repo"));
-    assert.strictEqual(events.length, 1);
-
-    clock += 2000; // past the window
-    child.emit(pushEvent("/repo"));
+    child.emit(pushEvent("/repo", "terminal"));
+    clock += 100;
+    child.emit(pushEvent("/repo", "terminal"));
+    clock += 100;
+    child.emit(pushEvent("/repo", "terminal-trace2"));
+    clock += 100;
+    child.emit(pushEvent("/repo", "terminal-trace2"));
     assert.strictEqual(events.length, 2);
 
+    child.emit(pushEvent("/published", "git-operation"));
+    child.emit(pushEvent("/published", "git-publish"));
+    assert.strictEqual(events.length, 3);
+
+    composite.dispose();
+  });
+
+  test("preserves repeated events from the same source", async () => {
+    const child = new FakeDetector();
+    const composite = new CompositePushDetector([child], {
+      now: () => 0,
+    });
+    const events: PushEvent[] = [];
+    composite.onDidPush((event) => events.push(event));
+
+    await composite.start();
+    child.emit(pushEvent("/repo", "terminal"));
+    child.emit(pushEvent("/repo", "terminal"));
+
+    assert.strictEqual(events.length, 2);
+    composite.dispose();
+  });
+
+  test("matches a terminal subdirectory with its Trace2 repository root", async () => {
+    const child = new FakeDetector();
+    const composite = new CompositePushDetector([child], {
+      now: () => 0,
+    });
+    const events: PushEvent[] = [];
+    composite.onDidPush((event) => events.push(event));
+
+    await composite.start();
+    child.emit(pushEvent("/repo/packages/app", "terminal", false));
+    child.emit(pushEvent("/repo", "terminal-trace2"));
+
+    assert.strictEqual(events.length, 1);
+    composite.dispose();
+  });
+
+  test("does not pair terminal signals from unrelated repositories", async () => {
+    const child = new FakeDetector();
+    const composite = new CompositePushDetector([child], {
+      now: () => 0,
+    });
+    const events: PushEvent[] = [];
+    composite.onDidPush((event) => events.push(event));
+
+    await composite.start();
+    child.emit(pushEvent("/repo-a", "terminal"));
+    child.emit(pushEvent("/repo-b", "terminal-trace2"));
+
+    assert.strictEqual(events.length, 2);
+    composite.dispose();
+  });
+
+  test("does not collapse exact roots for nested repositories", async () => {
+    const child = new FakeDetector();
+    const composite = new CompositePushDetector([child], {
+      now: () => 0,
+    });
+    const events: PushEvent[] = [];
+    composite.onDidPush((event) => events.push(event));
+
+    await composite.start();
+    child.emit(pushEvent("/repo", "terminal", true));
+    child.emit(pushEvent("/repo/nested", "terminal-trace2", true));
+
+    assert.strictEqual(events.length, 2);
+    composite.dispose();
+  });
+
+  test("does not suppress counterparts outside the window", async () => {
+    let clock = 0;
+    const child = new FakeDetector();
+    const composite = new CompositePushDetector([child], {
+      dedupeWindowMs: 1500,
+      now: () => clock,
+    });
+    const events: PushEvent[] = [];
+    composite.onDidPush((event) => events.push(event));
+
+    await composite.start();
+    child.emit(pushEvent("/repo", "terminal"));
+    clock += 1500;
+    child.emit(pushEvent("/repo", "terminal-trace2"));
+
+    assert.strictEqual(events.length, 2);
     composite.dispose();
   });
 
@@ -86,6 +186,22 @@ suite("CompositePushDetector", () => {
     child.emit(pushEvent("/b"));
     assert.strictEqual(events.length, 2);
 
+    composite.dispose();
+  });
+
+  test("does not collapse events with unknown repositories", async () => {
+    const child = new FakeDetector();
+    const composite = new CompositePushDetector([child], {
+      now: () => 0,
+    });
+    const events: PushEvent[] = [];
+    composite.onDidPush((event) => events.push(event));
+
+    await composite.start();
+    child.emit(pushEvent(undefined, "terminal"));
+    child.emit(pushEvent(undefined, "terminal-trace2"));
+
+    assert.strictEqual(events.length, 2);
     composite.dispose();
   });
 });

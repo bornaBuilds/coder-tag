@@ -65,6 +65,19 @@ export class GitManager {
   }
 
   /**
+   * Normalizes a path reported by terminal or Trace2 integration to the root
+   * shape used by Git operation events, including Cursor's repository wrapper.
+   */
+  public resolveRepositoryRoot(uri: vscode.Uri): string {
+    return this.findRepositoryRoot(uri) ?? uri.fsPath;
+  }
+
+  public findRepositoryRoot(uri: vscode.Uri): string | undefined {
+    const entry = this.getModel()?.getRepository(uri);
+    return entry?.root ?? entry?.repository?.root;
+  }
+
+  /**
    * Returns the git extension's internal model when it exposes the shape we
    * rely on, otherwise undefined. This is an unsupported API surface, so the
    * result is validated before use and callers must degrade gracefully.
